@@ -1,0 +1,190 @@
+#!/bin/bash
+
+LABEL="$1"
+PACKAGE_VERSION="${2:-$(uname -r)}"
+PACKAGE_SUFFIX="+${LABEL}"
+DISTRO="${3:-$(lsb_release -c -s)}"
+CHROOT="${4:-$DISTRO-chroot}"
+
+KEYSERVER="hkp://keyserver.ubuntu.com"
+POP_OS_APT_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
+
+## Functions
+
+usage()
+{
+    echo "Usage: $(basename $0) <label> [version] [ubuntu-codename] [path]" 1>&2
+    exit 1
+}
+
+
+log()
+{
+    echo "$(basename $0): $*"
+}
+
+
+build_chroot()
+{
+    if [ -e $CHROOT ]; then
+        log "$CHROOT exists, skipping"
+    else
+        debootstrap $DISTRO $CHROOT
+    fi
+}
+
+
+in_chroot()
+{
+    chroot $CHROOT "$@"
+}
+
+
+mount_filesystems()
+{
+    mountpoint -q $CHROOT/proc || mount -t proc none $CHROOT/proc
+    mountpoint -q $CHROOT/dev  || mount -o bind /dev $CHROOT/dev
+
+    # We sleep briefly to avoid 'target is busy' message for /proc
+    trap "sleep 0.5; umount $CHROOT/{dev,proc}" EXIT
+}
+
+
+install_pop_os_keys()
+{
+    export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE="DontWarn"
+
+    local key
+    for key in $POP_OS_APT_KEYS; do
+        if ! grep -qs 'PGP PUBLIC KEY' <(in_chroot apt-key export "$key"); then
+            in_chroot apt-key adv --keyserver "$KEYSERVER" --recv-keys "$key"
+        else
+            log "$key already installed, skipping"
+        fi
+    done
+}
+
+
+add_apt_sources()
+{
+    # We'll need gpg in install_pop_os_keys to retrieve the APT keys for
+    # the Pop!_OS APT sources.
+    in_chroot apt-get update
+    in_chroot apt-get install -y gpg
+
+    local files=(
+        /etc/apt/sources.list.d/system.sources
+        /etc/apt/sources.list.d/pop-os-ppa.list
+    )
+    for file in "${files[@]}"; do
+        cp $file "$CHROOT/$(dirname $file)/"
+    done
+
+    install_pop_os_keys
+}
+
+
+update_packages()
+{
+    in_chroot apt-get update
+    in_chroot apt-get upgrade -y
+}
+
+
+install_build_dependencies()
+{
+    local script="$CHROOT/root/install-build-deps.sh"
+    in_chroot apt-get install -y build-essential fakeroot
+
+    in_chroot /bin/sh -s <<EOF
+# If LANG and LC_ALL aren't set tex-common won't install cleanly
+export LANG="C.UTF-8" LC_ALL="C.UTF-8"
+
+apt-get build-dep -y linux
+EOF
+}
+
+
+install_kernel_source()
+{
+    in_chroot /bin/sh -c "cd /usr/src && apt-get source linux-image-$PACKAGE_VERSION"
+}
+
+
+apply_patches()
+{
+    # Drop any patches that you need to apply into ./patches
+    cp -r ./patches $CHROOT/usr/src
+
+    in_chroot /bin/sh -s <<EOF
+cd $KERNEL_SRC
+for PATCH in ../patches/*.patch; do
+    patch --forward -p1 < \$PATCH
+done
+EOF
+}
+
+
+add_label_to_changelog_header()
+{
+    sed "s/\(([^)]\+\)/\1$PACKAGE_SUFFIX/"
+}
+
+
+add_changelog_entry()
+{
+    local changelog=$CHROOT/$KERNEL_SRC/debian.master/changelog
+
+    if head -n 1 $changelog | grep -qs "$PACKAGE_SUFFIX)"; then
+        log "changelog already updated, skipping"
+    else
+        cat > changelog.entry <<EOF
+$(head -n 1 $changelog | add_label_to_changelog_header)
+
+  * Applying local patches
+$(printf "    - %s\n" $(ls ./patches/*.patch))
+
+EOF
+        cat changelog.entry $changelog > changelog.new
+        rm changelog.entry
+        mv changelog.new $changelog
+    fi
+}
+
+
+build_packages()
+{
+    in_chroot /bin/sh -s <<EOF
+cd $KERNEL_SRC
+fakeroot debian/rules clean
+fakeroot debian/rules binary-headers binary-generic binary-indep
+EOF
+}
+
+
+move_packages()
+{
+    mv $CHROOT/$KERNEL_SRC/*.deb $(dirname $0)
+}
+
+
+## Main program
+
+KERNEL_RELEASE="${PACKAGE_VERSION%%-*}"
+KERNEL_SRC="/usr/src/linux-$KERNEL_RELEASE"
+
+set -e
+[ -n "$DEBUG" ] && set -x
+
+[ -z "$LABEL" ] && usage
+
+build_chroot
+mount_filesystems
+add_apt_sources
+update_packages
+install_build_dependencies
+install_kernel_source
+apply_patches
+add_changelog_entry
+build_packages
+move_packages
