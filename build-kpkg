@@ -1,0 +1,30 @@
+#!/bin/sh
+
+DISTRO="${1:-$(lsb_release -c -s)}"
+CHROOT="${2:-$DISTRO-chroot}"
+
+## Functions
+
+configure_apt()
+{
+    local path
+    for path in etc/apt/sources.list; do
+        cp /$path $CHROOT/$path
+    done
+}
+
+
+update_packages()
+{
+    chroot $CHROOT apt-get update
+    chroot $CHROOT apt-get upgrade -y
+}
+
+
+## Main program
+
+set -e
+
+debootstrap $DISTRO $CHROOT
+configure_apt
+update_packages
