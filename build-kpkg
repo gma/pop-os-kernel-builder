@@ -26,11 +26,7 @@ build_chroot()
 
 configure_apt()
 {
-    local path
-
-    for path in etc/apt/sources.list; do
-        cp /$path $CHROOT/$(dirname $path)/
-    done
+    cp /etc/apt/sources.list $CHROOT/etc/apt/
 }
 
 
@@ -42,11 +38,12 @@ in_chroot()
 
 install_pop_os_key()
 {
+    export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE="DontWarn"
     if [ "$(apt-key export $POP_OS_KEY)" = "" ]; then
         in_chroot apt-get install -y gpg
         in_chroot apt-key adv --keyserver "$KEYSERVER" --recv-keys "$POP_OS_KEY"
     else
-        log "$POP_OS_KEY already installed"
+        log "$POP_OS_KEY already installed, skipping"
     fi
 }
 
