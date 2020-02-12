@@ -4,7 +4,7 @@ DISTRO="${1:-$(lsb_release -c -s)}"
 CHROOT="${2:-$DISTRO-chroot}"
 
 KEYSERVER="hkp://keyserver.ubuntu.com"
-POP_OS_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
+POP_OS_APT_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
 
 ## Functions
 
@@ -16,10 +16,10 @@ log()
 
 build_chroot()
 {
-    if [ ! -e $CHROOT ]; then
-        debootstrap $DISTRO $CHROOT
-    else
+    if [ -e $CHROOT ]; then
         log "$CHROOT exists, skipping"
+    else
+        debootstrap $DISTRO $CHROOT
     fi
 }
 
@@ -45,7 +45,7 @@ install_pop_os_keys()
     export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE="DontWarn"
 
     local key
-    for key in $POP_OS_KEYS; do
+    for key in $POP_OS_APT_KEYS; do
         if ! grep -qs 'PGP PUBLIC KEY' <(in_chroot apt-key export "$key"); then
             in_chroot apt-key adv --keyserver "$KEYSERVER" --recv-keys "$key"
         else
@@ -57,7 +57,8 @@ install_pop_os_keys()
 
 add_apt_sources()
 {
-    # We'll need gpg to retrieve the APT keys for the Pop!_OS sources
+    # We'll need gpg in install_pop_os_keys to retrieve the APT keys for
+    # the Pop!_OS APT sources.
     apt-get update
     in_chroot apt-get update
     in_chroot apt-get install -y gpg
