@@ -108,9 +108,15 @@ EOF
 }
 
 
+install_kernel_source()
+{
+    in_chroot "cd $SRC && apt-get source linux-image-$PACKAGE_VERSION"
+}
+
+
 install_local_patches()
 {
-    cp -r ./patches $CHROOT/$SRC_DIR
+    cp -r ./patches $CHROOT/usr/src
 }
 
 
@@ -122,8 +128,7 @@ add_label_to_changelog_header()
 
 add_changelog_entry()
 {
-    local kernel="$CHROOT/$SRC_DIR/linux-$KERNEL_RELEASE"
-    local changelog=$kernel/debian.master/changelog
+    local changelog=$KERNEL_SRC/debian.master/changelog
 
     if head -n 1 $changelog | grep -qs "+$LABEL)"; then
         log "changelog already updated, skipping"
@@ -151,11 +156,7 @@ build_packages()
 set -e
 [ -n "$DEBUG" ] && set -x
 
-cd $SRC_DIR
-
-apt-get source "linux-image-$PACKAGE_VERSION"
-
-cd linux-$KERNEL_RELEASE
+cd $KERNEL_SRC
 
 for PATCH in /usr/src/patches/*.patch; do
     patch -p1 < \$PATCH
@@ -172,7 +173,7 @@ EOF
 
 move_packages()
 {
-    mv $CHROOT/$SRC_DIR/linux-$KERNEL_RELEASE/*.deb $(dirname $0)
+    mv $KERNEL_SRC/*.deb $(dirname $0)
 }
 
 
@@ -180,7 +181,7 @@ move_packages()
 
 PACKAGE_VERSION="$(uname -r)"
 KERNEL_RELEASE="${PACKAGE_VERSION%%-*}"
-SRC_DIR="/usr/src"
+KERNEL_SRC="$CHROOT/usr/src/linux-$KERNEL_RELEASE"
 
 set -e
 
