@@ -34,7 +34,7 @@ build_chroot()
 
 in_chroot()
 {
-    chroot $CHROOT $*
+    chroot $CHROOT "$@"
 }
 
 
@@ -110,7 +110,7 @@ EOF
 
 install_kernel_source()
 {
-    in_chroot "cd /usr/src && apt-get source linux-image-$PACKAGE_VERSION"
+    in_chroot /bin/sh -c "cd /usr/src && apt-get source linux-image-$PACKAGE_VERSION"
 
     # Drop any patches that you need to apply into ./patches
     cp -r ./patches $CHROOT/usr/src
@@ -125,7 +125,7 @@ add_label_to_changelog_header()
 
 add_changelog_entry()
 {
-    local changelog=$KERNEL_SRC/debian.master/changelog
+    local changelog=$CHROOT/$KERNEL_SRC/debian.master/changelog
 
     if head -n 1 $changelog | grep -qs "+$LABEL)"; then
         log "changelog already updated, skipping"
@@ -170,7 +170,7 @@ EOF
 
 move_packages()
 {
-    mv $KERNEL_SRC/*.deb $(dirname $0)
+    mv $CHROOT/$KERNEL_SRC/*.deb $(dirname $0)
 }
 
 
@@ -178,7 +178,7 @@ move_packages()
 
 PACKAGE_VERSION="$(uname -r)"
 KERNEL_RELEASE="${PACKAGE_VERSION%%-*}"
-KERNEL_SRC="$CHROOT/usr/src/linux-$KERNEL_RELEASE"
+KERNEL_SRC="/usr/src/linux-$KERNEL_RELEASE"
 
 set -e
 
