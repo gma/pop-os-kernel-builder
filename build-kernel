@@ -110,12 +110,9 @@ EOF
 
 install_kernel_source()
 {
-    in_chroot "cd $SRC && apt-get source linux-image-$PACKAGE_VERSION"
-}
+    in_chroot "cd /usr/src && apt-get source linux-image-$PACKAGE_VERSION"
 
-
-install_local_patches()
-{
+    # Drop any patches that you need to apply into ./patches
     cp -r ./patches $CHROOT/usr/src
 }
 
@@ -194,7 +191,7 @@ mount_filesystems
 add_apt_sources
 update_packages
 install_build_dependencies
-install_local_patches
+install_kernel_source
 add_changelog_entry
 build_packages
 move_packages
