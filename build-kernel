@@ -163,6 +163,8 @@ fakeroot debian/rules clean
 fakeroot debian/rules binary-headers binary-generic binary-indep
 EOF
 
+    in_chroot apt-get install -y fakeroot
+
     chmod +x $script
     in_chroot "${script#$CHROOT}"
 }
