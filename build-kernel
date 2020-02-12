@@ -1,12 +1,20 @@
 #!/bin/bash
 
-DISTRO="${1:-$(lsb_release -c -s)}"
-CHROOT="${2:-$DISTRO-chroot}"
+LABEL="$1"
+DISTRO="${2:-$(lsb_release -c -s)}"
+CHROOT="${3:-$DISTRO-chroot}"
 
 KEYSERVER="hkp://keyserver.ubuntu.com"
 POP_OS_APT_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
 
 ## Functions
+
+usage()
+{
+    echo "Usage: $(basename $0) <label> [ubuntu-codename] [path]" 1>&2
+    exit 1
+}
+
 
 log()
 {
@@ -106,7 +114,35 @@ install_local_patches()
 }
 
 
-build_kernel()
+add_label_to_changelog_header()
+{
+    sed "s/\(([^)]\+\)/\1+$LABEL/"
+}
+
+
+add_changelog_entry()
+{
+    local kernel="$CHROOT/$SRC_DIR/linux-$KERNEL_RELEASE"
+    local changelog=$kernel/debian.master/changelog
+
+    if head -n 1 $changelog | grep -qs "+$LABEL)"; then
+        log "changelog already updated, skipping"
+    else
+        cat > changelog.entry <<EOF
+$(head -n 1 $changelog | add_label_to_changelog_header)
+
+  * Applying local patches
+$(printf "    - %s\n" $(ls ./patches))
+
+EOF
+        cat changelog.entry $changelog > changelog.new
+        rm changelog.entry
+        mv changelog.new $changelog
+    fi
+}
+
+
+build_packages()
 {
     local script="$CHROOT/root/build-kernel.sh"
     cat > $script <<EOF
@@ -117,32 +153,40 @@ set -e
 
 cd $SRC_DIR
 
-RELEASE="$(uname -r)"
+apt-get source "linux-image-$PACKAGE_VERSION"
 
-apt-get source "linux-image-$RELEASE"
-
-cd linux-${RELEASE%%-*}
+cd linux-$KERNEL_RELEASE
 
 for PATCH in /usr/src/patches/*.patch; do
-    patch -p1 < $PATCH
+    patch -p1 < \$PATCH
 done
 
 fakeroot debian/rules clean
 fakeroot debian/rules binary-headers binary-generic binary-indep
 EOF
-    
+
     chmod +x $script
     in_chroot "${script#$CHROOT}"
 }
 
 
+move_packages()
+{
+    mv $CHROOT/$SRC_DIR/linux-$KERNEL_RELEASE/*.deb $(dirname $0)
+}
+
+
 ## Main program
 
+PACKAGE_VERSION="$(uname -r)"
+KERNEL_RELEASE="${PACKAGE_VERSION%%-*}"
 SRC_DIR="/usr/src"
 
 set -e
 
 [ -n "$DEBUG" ] && set -x
+
+[ -z "$LABEL" ] && usage
 
 build_chroot
 mount_filesystems
@@ -150,4 +194,6 @@ add_apt_sources
 update_packages
 install_build_dependencies
 install_local_patches
-build_kernel
+add_changelog_entry
+build_packages
+move_packages
