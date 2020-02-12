@@ -1,10 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 
 DISTRO="${1:-$(lsb_release -c -s)}"
 CHROOT="${2:-$DISTRO-chroot}"
 
 KEYSERVER="hkp://keyserver.ubuntu.com"
-POP_OS_KEY="204DD8AEC33A7AFF"
+POP_OS_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
 
 ## Functions
 
@@ -24,27 +24,53 @@ build_chroot()
 }
 
 
-configure_apt()
-{
-    cp /etc/apt/sources.list $CHROOT/etc/apt/
-}
-
-
 in_chroot()
 {
     chroot $CHROOT $*
 }
 
 
-install_pop_os_key()
+mount_filesystems()
+{
+    mountpoint -q $CHROOT/proc || mount -t proc none $CHROOT/proc
+    mountpoint -q $CHROOT/dev  || mount -o bind /dev $CHROOT/dev
+
+    # We sleep briefly to avoid 'target is busy' message for /proc
+    trap "sleep 0.5; umount $CHROOT/{dev,proc}" EXIT
+}
+
+
+install_pop_os_keys()
 {
     export APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE="DontWarn"
-    if [ "$(apt-key export $POP_OS_KEY)" = "" ]; then
-        in_chroot apt-get install -y gpg
-        in_chroot apt-key adv --keyserver "$KEYSERVER" --recv-keys "$POP_OS_KEY"
-    else
-        log "$POP_OS_KEY already installed, skipping"
-    fi
+
+    local key
+    for key in $POP_OS_KEYS; do
+        if ! grep -qs 'PGP PUBLIC KEY' <(in_chroot apt-key export "$key"); then
+            in_chroot apt-key adv --keyserver "$KEYSERVER" --recv-keys "$key"
+        else
+            log "$key already installed, skipping"
+        fi
+    done
+}
+
+
+add_apt_sources()
+{
+    # We'll need gpg to retrieve the APT keys for the Pop!_OS sources
+    apt-get update
+    in_chroot apt-get update
+    in_chroot apt-get install -y gpg
+
+    local files=(
+        /etc/apt/sources.list
+        /etc/apt/sources.list.d/system76-ubuntu-pop-$DISTRO.list
+    )
+    for file in "${files[@]}"; do
+        cp $file "$CHROOT/$(dirname $file)/"
+    done
+
+    install_pop_os_keys
 }
 
 
@@ -55,11 +81,55 @@ update_packages()
 }
 
 
+install_build_dependencies()
+{
+    local script="$CHROOT/root/install-build-deps.sh"
+
+    cat > $script <<EOF
+#!/bin/sh
+
+# If LANG and LC_ALL aren't set tex-common won't install cleanly
+export LANG="C.UTF-8" LC_ALL="C.UTF-8"
+
+apt-get build-dep -y linux "linux-image-$(uname -r)"
+EOF
+
+    chmod +x $script
+    in_chroot "${script#$CHROOT}"
+}
+
+
+build_kernel()
+{
+    local script="$CHROOT/root/build-kernel.sh"
+    cat > $script <<EOF
+#!/bin/sh
+
+cd /usr/src
+
+VERSION="$(uname -r)"
+
+apt-get source "linux-image-$VERSION"
+
+cd linux-${VERSION%%-*}
+fakeroot debian/rules clean
+fakeroot debian/rules binary-headers binary-generic binary-indep
+EOF
+    
+    chmod +x $script
+    in_chroot "${script#$CHROOT}"
+}
+
+
 ## Main program
 
 set -e
 
+[ -n "$DEBUG" ] && set -x
+
 build_chroot
-configure_apt
-install_pop_os_key
+mount_filesystems
+add_apt_sources
 update_packages
+install_build_dependencies
+# build_kernel
