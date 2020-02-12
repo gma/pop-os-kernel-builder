@@ -1,1 +1,2 @@
-eoan-chroot
+*-chroot
+patches/x230-screen-and-aspm.patch

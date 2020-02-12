@@ -99,19 +99,33 @@ EOF
 }
 
 
+install_local_patches()
+{
+    cp -r ./patches $CHROOT/$SRC_DIR
+}
+
+
 build_kernel()
 {
     local script="$CHROOT/root/build-kernel.sh"
     cat > $script <<EOF
 #!/bin/sh
 
-cd /usr/src
+set -e
+[ -n "$DEBUG" ] && set -x
 
-VERSION="$(uname -r)"
+cd $SRC_DIR
 
-apt-get source "linux-image-$VERSION"
+RELEASE="$(uname -r)"
 
-cd linux-${VERSION%%-*}
+apt-get source "linux-image-$RELEASE"
+
+cd linux-${RELEASE%%-*}
+
+for PATCH in /usr/src/patches/*.patch; do
+    patch -p1 < $PATCH
+done
+
 fakeroot debian/rules clean
 fakeroot debian/rules binary-headers binary-generic binary-indep
 EOF
@@ -123,6 +137,8 @@ EOF
 
 ## Main program
 
+SRC_DIR="/usr/src"
+
 set -e
 
 [ -n "$DEBUG" ] && set -x
@@ -132,4 +148,5 @@ mount_filesystems
 add_apt_sources
 update_packages
 install_build_dependencies
-# build_kernel
+install_local_patches
+build_kernel
