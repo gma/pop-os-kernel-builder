@@ -107,14 +107,14 @@ EOF
 
 install_kernel_source()
 {
-    in_chroot /bin/sh -c "cd /usr/src && apt-get source linux-image-$PACKAGE_VERSION"
+    in_chroot /bin/sh -c "cd $SRC && apt-get source linux-image-$PACKAGE_VERSION"
 }
 
 
 apply_patches()
 {
     # Drop any patches that you need to apply into ./patches
-    cp -r ./patches $CHROOT/usr/src
+    cp -r ./patches $CHROOT/$SRC
 
     in_chroot /bin/sh -s <<EOF
 cd $KERNEL_SRC
@@ -167,14 +167,15 @@ EOF
 
 move_packages()
 {
-    mv $CHROOT/$KERNEL_SRC/*.deb $(dirname $0)
+    mv $CHROOT/$SRC/*.deb $(dirname $0)
 }
 
 
 ## Main program
 
+SRC="/usr/src"
 KERNEL_RELEASE="${PACKAGE_VERSION%%-*}"
-KERNEL_SRC="/usr/src/linux-$KERNEL_RELEASE"
+KERNEL_SRC="$SRC/linux-$KERNEL_RELEASE"
 
 set -e
 [ -n "$DEBUG" ] && set -x
