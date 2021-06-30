@@ -157,7 +157,7 @@ build_packages()
     in_chroot /bin/sh -s <<EOF
 cd $KERNEL_SRC
 fakeroot debian/rules clean
-fakeroot debian/rules binary-headers binary-generic binary-indep
+fakeroot debian/rules binary-headers binary-generic binary-perarch
 EOF
 }
 
