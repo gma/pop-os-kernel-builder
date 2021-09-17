@@ -1,10 +1,9 @@
 #!/bin/bash
 
 LABEL="$1"
-PACKAGE_VERSION="${2:-$(uname -r)}"
 PACKAGE_SUFFIX="+${LABEL}"
-DISTRO="${3:-$(lsb_release -c -s)}"
-CHROOT="${4:-$DISTRO-chroot}"
+DISTRO="${2:-$(lsb_release -c -s)}"
+CHROOT="$DISTRO-chroot"
 
 KEYSERVER="hkp://keyserver.ubuntu.com"
 POP_OS_APT_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
@@ -13,7 +12,7 @@ POP_OS_APT_KEYS="204DD8AEC33A7AFF 1E5F8BBC5BEB10AE"
 
 usage()
 {
-    echo "Usage: $(basename $0) <label> [version] [ubuntu-codename] [path]" 1>&2
+    echo "Usage: $(basename $0) <label> [version] [ubuntu-codename]" 1>&2
     exit 1
 }
 
@@ -108,7 +107,7 @@ EOF
 
 install_kernel_source()
 {
-    in_chroot /bin/sh -c "cd $SRC && apt-get source linux-image-$PACKAGE_VERSION"
+    in_chroot /bin/sh -c "cd $SRC && apt-get source linux"
 }
 
 
@@ -175,7 +174,8 @@ move_packages()
 ## Main program
 
 SRC="/usr/src"
-KERNEL_RELEASE="${PACKAGE_VERSION%%-*}"
+KERNEL_RELEASE="$(apt-cache showsrc --only-source linux | \
+    grep '^Version' | sed 's,^Version: ,,; s,-.*,,' | sort -n | tail -n 1)"
 KERNEL_SRC="$SRC/linux-$KERNEL_RELEASE"
 
 set -e

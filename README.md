@@ -10,7 +10,7 @@ To break that down a bit, this script will:
 - Use debootstrap to **create an Ubuntu chroot**.
 - Copy your local APT `sources.list` files into the chroot (we want to download the kernel from the Pop!_OS package repository — this is why you should run this script on a machine running Pop!_OS).
 - **Install the build dependencies** into the chroot.
-- **Download the source** for the kernel version you want to build.
+- **Download the source** for the latest available kernel.
 - **Apply your `.patch` files** that you've put in the `./patches` folder.
 - **Build the kernel** for you.
 
@@ -23,7 +23,7 @@ Installation
 Usage Synopsis
 --------------
 
-    $ sudo ./build-kernel <label> [ubuntu-codename] [path]
+    $ sudo ./build-kernel <label> [ubuntu-codename]
 
 The `label` argument is required, and will be appended to the version number of the resulting Debian packages. As [explained on the Ubuntu wiki], we need to modify the package version so that we can tell that we're running our modified kernel.
 
