@@ -46,7 +46,7 @@ mount_filesystems()
     mountpoint -q $CHROOT/dev  || mount -o bind /dev $CHROOT/dev
 
     # We sleep briefly to avoid 'target is busy' message for /proc
-    trap "sleep 0.5; umount $CHROOT/{dev,proc}" EXIT
+    trap "sleep 5; umount $CHROOT/{dev,proc} && sudo rm -rf $CHROOT" EXIT
 }
 
 
