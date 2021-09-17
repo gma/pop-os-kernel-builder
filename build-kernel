@@ -72,11 +72,12 @@ add_apt_sources()
     in_chroot apt-get update
     in_chroot apt-get install -y gpg
 
-    local files=(
+    local sources=(
         /etc/apt/sources.list.d/system.sources
-        /etc/apt/sources.list.d/pop-os-ppa.list
+        $(grep -l 'ppa.launchpad.*system76' /etc/apt/sources.list.d/*.list)
     )
-    for file in "${files[@]}"; do
+    local file
+    for file in "${sources[@]}"; do
         cp $file "$CHROOT/$(dirname $file)/"
     done
 
