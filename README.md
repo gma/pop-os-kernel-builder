@@ -38,12 +38,23 @@ To install all this stuff, use the `install-packages` script. It will use the `.
 Example
 -------
 
-    $ cd pop-os-kernel-builder
-    $ cp /path/to/my-kernel.patch ./patches
-    $ sudo ./build-kernel mylabel
-    $ sudo ./install-packages mylabel
+If you were modifying the kernel with a patch known as "foo", you might do this:
 
-Note that `build-kernel` will attempt to apply your patch from within the Linux kernel source's folder, using the command `patch -p1 < filename.patch`. The `-p1` will discard the first component of the directory names of the files referenced in the patch. If you find your patch doesn't apply, this might be why. You could edit the script to use `-p0`, but if that doesn't work it may be that your patch won't apply to the current kernel source without a bit of manual work.
+    $ cd pop-os-kernel-builder
+    $ cp /path/to/the-foo-mod.patch ./patches
+    $ sudo ./build-kernel foo
+    $ sudo ./install-packages foo
+
+Note that `build-kernel` will attempt to apply your patch from within the Linux kernel source's folder, using the command `patch -p1 < filename.patch`.
+
+The `-p1` will discard the first component of the directory names of the files referenced in the patch. If you find your patch doesn't apply, this might be why. You could edit the script to use `-p0`, but if that doesn't work it may be that your patch won't apply to the current kernel source without a bit of manual work.
+
+If you need to make a patch yourself, you could do it from two folders containing the kernel source like this:
+
+    $ cd /usr/src
+    $ diff -aur linux-x.y.z-orig linux-x.y.z-patched > my.patch
+
+Make sure that the patch is in a file whose name ends with `.patch`, or your patch will be ignored.
 
 Why?
 ----
