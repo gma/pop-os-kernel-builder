@@ -1,3 +1,6 @@
 *-chroot
+*.buildinfo
+*.changes
+*.control
 *.deb
 patches/*

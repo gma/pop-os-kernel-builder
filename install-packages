@@ -1,0 +1,40 @@
+#!/bin/bash
+
+LABEL="$1"
+
+## Functions
+
+usage()
+{
+    echo "Usage: $(basename $0) <label>" 1>&2
+    exit 1
+}
+
+
+latest_build()
+{
+    local pattern=linux-image-*-generic*$LABEL*.deb
+    ls $pattern | sort -n | tail -n 1 | \
+        sed 's/.*generic_//; s/_[a-z0-9]\+.deb//'
+}
+
+
+## Main program
+
+set -e
+
+[ -z "$LABEL" ] && usage
+
+PACKAGES=(linux-{system76,generic,image-generic,headers-generic}*deb)
+
+PACKAGE_VER=$(latest_build)
+for PREFIX in linux-image linux-headers linux-modules; do
+    PACKAGES+=($PREFIX-*$PACKAGE_VER*.deb)
+done
+dpkg -i "${PACKAGES[@]}"
+
+# Prevent automatic upgrades when new upstream kernels released
+for DEB in "${PACKAGES[@]}"; do
+    PACKAGE=$(echo $DEB | sed "s/_.*//")
+    apt-mark hold $PACKAGE
+done

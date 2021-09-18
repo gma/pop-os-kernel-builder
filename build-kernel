@@ -193,3 +193,4 @@ apply_patches
 add_changelog_entry
 build_packages
 move_packages
+$(dirname $0)/build-meta-packages $LABEL

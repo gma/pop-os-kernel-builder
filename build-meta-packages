@@ -1,0 +1,95 @@
+#!/bin/bash
+
+LABEL="$1"
+PACKAGE_PATTERN=linux-image-*-generic*x230*.deb
+
+## Functions
+
+usage()
+{
+    echo "Usage: $(basename $0) <label>" 1>&2
+    exit 1
+}
+
+
+err()
+{
+    echo "ERROR: $(basename $0): $@"
+    exit 1
+}
+
+
+kernel_built()
+{
+    [ -e $PACKAGE_PATTERN ]
+}
+
+
+latest_build()
+{
+    ls $PACKAGE_PATTERN | sort -n | tail -n 1 | \
+        sed 's/.*generic_//; s/_[a-z0-9]\+.deb//'
+}
+
+
+make_fake_meta_package()
+{
+    local package=$1
+    shift
+    local dependencies="$@"
+
+    local control="$package.control"
+
+    cat <<EOF > $control
+Section: kernel
+Priority: optional
+Standards-Version: 3.9.2
+Package: $package
+Version: $(echo $PACKAGE_VER | sed "s,+$LABEL,,")
+Maintainer: $(whoami) <$(whoami)@$(hostname -f)>
+# Pre-Depends: <comma-separated list of packages>
+Depends: $dependencies
+# Recommends: <comma-separated list of packages>
+# Suggests: <comma-separated list of packages>
+# Provides: <comma-separated list of packages>
+# Replaces: <comma-separated list of packages>
+# Architecture: all
+# Multi-Arch: <one of: foreign|same|allowed>
+# Copyright: <copyright file; defaults to GPL2>
+# Changelog: <changelog file; defaults to a generic changelog>
+# Readme: <README.Debian file; defaults to a generic one>
+Extra-Files: README.md
+# Links: <pair of space-separated paths; First is path symlink points at, second is filename of link>
+# Files: <pair of space-separated paths; First is file to include, second is destination>
+#  <more pairs, if there's more than one file to include. Notice the starting space>
+Description: Fake $package package for custom kernel
+ This package was created by the $(basename $0) script in the
+ pop-os-kernel-builder project, in order to satisfy the package
+ dependencies for a kernel built with custom patches.
+ .
+ If we didn't install fake kernel meta packages then we'd block upgrades
+ to the pop-desktop package, which depends on linux-system76.
+EOF
+
+    equivs-build $control
+}
+
+
+## Main program
+
+set -e
+
+[ -z "$LABEL" ] && usage
+
+if ! kernel_built; then
+    err "Kernel packages not found, run ./build-kernel first"
+fi
+
+PACKAGE_VER=$(latest_build)
+KERNEL_VER=$(latest_build | sed "s,\(-[0-9]\+\)\..*,\1,g")
+
+make_fake_meta_package linux-image-generic \
+    "linux-image-$KERNEL_VER-generic (=$PACKAGE_VER), linux-modules-extra-$KERNEL_VER-generic (=$PACKAGE_VER)"
+make_fake_meta_package linux-headers-generic "linux-headers-$KERNEL_VER-generic (=$PACKAGE_VER)"
+make_fake_meta_package linux-generic "linux-image-generic, linux-headers-generic"
+make_fake_meta_package linux-system76 "linux-generic"
