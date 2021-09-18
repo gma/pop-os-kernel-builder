@@ -23,13 +23,9 @@ Installation
 Usage Synopsis
 --------------
 
-    $ sudo ./build-kernel <label> [ubuntu-codename]
+    $ sudo ./build-kernel <label>
 
 The `label` argument is required, and will be appended to the version number of the resulting Debian packages. As [explained on the Ubuntu wiki], we need to modify the package version so that we can tell that we're running our modified kernel.
-
-`ubuntu-codename` is optional, and defaults to the name of the Ubuntu release that the Pop!_OS distribution that you're running is based upon (e.g. "disco", "eoan", etc). You can check this by running `lsb_release -c -s`.
-
-The `path` argument is the name of the folder in which the chroot is created. It defaults to `./<ubuntu-codename>-chroot`.
 
 Example
 -------

@@ -2,7 +2,7 @@
 
 LABEL="$1"
 PACKAGE_SUFFIX="+${LABEL}"
-DISTRO="${2:-$(lsb_release -c -s)}"
+DISTRO="$(lsb_release -c -s)"
 CHROOT="$DISTRO-chroot"
 
 KEYSERVER="hkp://keyserver.ubuntu.com"
